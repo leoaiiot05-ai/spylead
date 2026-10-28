@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from spylead.config import ConfigError, check_table, read_toml
+from spylead.pit import FORMS
 
-FORMS = ("LOG", "LEVEL")
 NAME = re.compile(r"[A-Za-z0-9_]{1,40}")
 # SPEC.md §11's pattern for FRED IDs: the ID goes into a FRED URL.
 FRED_ID = re.compile(r"[A-Z0-9_]{1,40}")

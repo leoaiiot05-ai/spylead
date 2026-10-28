@@ -10,6 +10,7 @@ Nothing here is in scope for v1. Do not build any of it without being asked. App
 - [ ] Scheduled automatic fetches. Today: the [Fetch Data] button only.
 - [ ] Export of series and results as CSV.
 - [ ] Use revised (latest-vintage) values as an alternative to first releases.
+- [ ] Re-date only the observations released on the archive's first vintage day, the series' earliest release day. §5.2 also re-dates a first release that came more than typical_lag + 60 days late inside the archive, to a day before it was published. Seam: `pit.estimate_release_days`.
 
 ## Analysis
 

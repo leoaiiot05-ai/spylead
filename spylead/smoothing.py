@@ -8,7 +8,8 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import solveh_banded
 
-DAYS_PER_YEAR = 365.25
+from spylead.pit import DAYS_PER_YEAR, days_to_x
+
 MIN_POINTS = 8
 WARM_UP_MONTHS = 36
 LOG_LAMBDA_LOW = -8.0
@@ -236,7 +237,7 @@ def refit_anchors(days: np.ndarray, y: np.ndarray, n_per_year: float, today: int
     counts = np.searchsorted(days, month_ends, side="right")
     # Fewer than MIN_POINTS points give no anchor, and a month without a new point keeps the previous anchor.
     fitted = (counts >= MIN_POINTS) & (np.diff(counts, prepend=0) > 0)
-    x = days / DAYS_PER_YEAR
+    x = days_to_x(days)
     results = []
     start = None
     for count in counts[fitted].tolist():
@@ -264,7 +265,7 @@ def anchor_values(anchors: Anchors, first_day: int, last_day: int) -> np.ndarray
     values = np.full(day.size, np.nan)
     defined = k >= 0
     k = k[defined]
-    values[defined] = anchors.value[k] + anchors.slope[k] * (day[defined] / DAYS_PER_YEAR - anchors.x[k])
+    values[defined] = anchors.value[k] + anchors.slope[k] * (days_to_x(day[defined]) - anchors.x[k])
     return values
 
 
@@ -282,6 +283,6 @@ def reference_fit(days: np.ndarray, y: np.ndarray, n_per_year: float) -> Referen
     days, y = np.asarray(days, dtype=np.int64), np.asarray(y, dtype=float)
     if days.size < MIN_POINTS:
         return Reference(int(days[0]) if days.size else 0, np.empty(0), math.nan, False)
-    smoothed = search_lambda(days / DAYS_PER_YEAR, y, inflection_target(days, n_per_year))
-    grid = np.arange(days[0], days[-1] + 1) / DAYS_PER_YEAR
+    smoothed = search_lambda(days_to_x(days), y, inflection_target(days, n_per_year))
+    grid = days_to_x(np.arange(days[0], days[-1] + 1))
     return Reference(int(days[0]), spline_values(smoothed.fit.spline, grid), smoothed.lam, smoothed.at_limit)
