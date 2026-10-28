@@ -30,3 +30,5 @@ Nothing here is in scope for v1. Do not build any of it without being asked. App
 
 - [ ] Daily backup of `data/spylead.db`.
 - [ ] Run as a Windows service instead of a logon task.
+- [ ] Report every `config.toml` and `catalog.toml` error at once; startup stops at the first today. Seam: `config.check_table`.
+- [ ] Show config and catalog errors under `pythonw.exe` (autostart): they are printed before logging starts, and pythonw has no console. Seam: `__main__.main`.

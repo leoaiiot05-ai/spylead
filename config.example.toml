@@ -1,0 +1,12 @@
+# Copy to config.toml, which git ignores, and fill it in. catalog.toml, data/ and logs/ sit next to it.
+# A random token: python -c "import secrets; print(secrets.token_urlsafe(24))"
+
+[web]
+port = 8090            # always bound to 127.0.0.1; publish it with Tailscale Serve
+token = "change-me"    # random, at least 16 characters
+
+[fred]
+api_key = ""           # free key from the FRED account page
+
+[tiingo]
+api_key = ""           # free API token from the Tiingo account page

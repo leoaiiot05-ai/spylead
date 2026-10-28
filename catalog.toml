@@ -1,0 +1,149 @@
+# The candidate indicators (SPEC.md §4.3). spylead reads this file at startup and keeps its order.
+# name: [A-Za-z0-9_]{1,40}, unique. fred_id: the FRED series ID.
+# form: LOG fits ln(value); LEVEL fits the value itself, for series that can be zero or negative (§5.4).
+# default_lag_days: days from the FRED date to the first release, used when recent releases are too few
+# to measure the lag (§5.2).
+
+[[series]]
+name = "M2"
+fred_id = "M2SL"
+form = "LOG"
+default_lag_days = 55
+title_en = "M2 money stock"
+title_zh = "M2 貨幣供給額"
+
+[[series]]
+name = "Spread_CCC"
+fred_id = "BAMLH0A3HYC"
+form = "LEVEL"
+default_lag_days = 1
+title_en = "ICE BofA CCC & lower high-yield option-adjusted spread"
+title_zh = "ICE 美銀 CCC 級及以下高收益債券選擇權調整利差"
+
+[[series]]
+name = "PMI_Philly"
+fred_id = "GACDFSA066MSFRBPHI"
+form = "LEVEL"
+default_lag_days = 18
+title_en = "Philadelphia Fed manufacturing survey, current general activity"
+title_zh = "費城聯準銀行製造業調查：當前整體活動"
+
+[[series]]
+name = "PMI_Philly_Future"
+fred_id = "GAFDFSA066MSFRBPHI"
+form = "LEVEL"
+default_lag_days = 18
+title_en = "Philadelphia Fed manufacturing survey, future general activity (six months ahead)"
+title_zh = "費城聯準銀行製造業調查：未來整體活動（六個月後）"
+
+[[series]]
+name = "Spread_10Y2Y"
+fred_id = "T10Y2Y"
+form = "LEVEL"
+default_lag_days = 1
+title_en = "10-year minus 2-year Treasury"
+title_zh = "美國 10 年期減 2 年期公債殖利率差"
+
+[[series]]
+name = "Spread_10Y3M"
+fred_id = "T10Y3M"
+form = "LEVEL"
+default_lag_days = 1
+title_en = "10-year minus 3-month Treasury"
+title_zh = "美國 10 年期公債減 3 個月期國庫券殖利率差"
+
+[[series]]
+name = "Spread_BAA10Y"
+fred_id = "BAA10Y"
+form = "LEVEL"
+default_lag_days = 1
+title_en = "Moody's Baa corporate minus 10-year Treasury"
+title_zh = "穆迪 Baa 級公司債減美國 10 年期公債殖利率差"
+
+[[series]]
+name = "Spread_HY"
+fred_id = "BAMLH0A0HYM2"
+form = "LEVEL"
+default_lag_days = 1
+title_en = "ICE BofA US high-yield option-adjusted spread"
+title_zh = "ICE 美銀美國高收益債券選擇權調整利差"
+
+[[series]]
+name = "Claims"
+fred_id = "ICSA"
+form = "LOG"
+default_lag_days = 5
+title_en = "Initial jobless claims"
+title_zh = "初領失業救濟金人數"
+
+[[series]]
+name = "Permits"
+fred_id = "PERMIT"
+form = "LOG"
+default_lag_days = 48
+title_en = "New private housing units authorized by building permits"
+title_zh = "新建私人住宅營建許可戶數"
+
+[[series]]
+name = "Hours_Mfg"
+fred_id = "AWHMAN"
+form = "LOG"
+default_lag_days = 35
+title_en = "Average weekly hours, manufacturing"
+title_zh = "製造業平均每週工時"
+
+[[series]]
+name = "Orders_Capex"
+fred_id = "NEWORDER"
+form = "LOG"
+default_lag_days = 56
+title_en = "New orders, nondefense capital goods excluding aircraft"
+title_zh = "非國防資本財新訂單（不含飛機）"
+
+[[series]]
+name = "Sentiment"
+fred_id = "UMCSENT"
+form = "LOG"
+default_lag_days = 60
+title_en = "University of Michigan consumer sentiment"
+title_zh = "密西根大學消費者信心指數"
+
+[[series]]
+name = "NFCI"
+fred_id = "NFCI"
+form = "LEVEL"
+default_lag_days = 5
+title_en = "Chicago Fed National Financial Conditions Index"
+title_zh = "芝加哥聯準銀行全國金融狀況指數"
+
+[[series]]
+name = "STLFSI"
+fred_id = "STLFSI4"
+form = "LEVEL"
+default_lag_days = 6
+title_en = "St. Louis Fed Financial Stress Index"
+title_zh = "聖路易聯準銀行金融壓力指數"
+
+[[series]]
+name = "VIX"
+fred_id = "VIXCLS"
+form = "LOG"
+default_lag_days = 1
+title_en = "CBOE volatility index"
+title_zh = "芝加哥選擇權交易所波動率指數"
+
+[[series]]
+name = "FedFunds"
+fred_id = "DFF"
+form = "LEVEL"
+default_lag_days = 1
+title_en = "Effective federal funds rate"
+title_zh = "有效聯邦資金利率"
+
+[[series]]
+name = "OECD_CLI"
+fred_id = "USALOLITOAASTSAM"
+form = "LOG"
+default_lag_days = 44
+title_en = "OECD composite leading indicator, amplitude adjusted"
+title_zh = "OECD 綜合領先指標（振幅調整）"
