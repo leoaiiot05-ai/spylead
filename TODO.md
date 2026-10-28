@@ -18,6 +18,7 @@ Nothing here is in scope for v1. Do not build any of it without being asked. App
 - [ ] Automatic choice of the best subset of LEADL1 series for F.
 - [ ] Weekly instead of monthly refits for the one-sided series, to react faster.
 - [ ] Cache the one-sided anchors if compute time grows. Today a full compute fits within the budget.
+- [ ] Carry IRLS weights across refits (the previous refit's weights, 1 for new points) if the bench shows the one-sided refits dominate the compute. Today each refit's search starts from unit weights. Seam: `smoothing.refit_anchors`.
 - [ ] A significance test for leads (for example a block bootstrap), beyond the out-of-sample score.
 
 ## Interface
