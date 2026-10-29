@@ -77,3 +77,31 @@
 ## Deferred items (appended to TODO.md)
 
 None.
+
+### For the owner: INSUFFICIENT_OVERLAP cannot arise
+
+This follows from §6.4 and §7 as written. No rule was changed.
+
+- Every one-sided series is defined from its first anchor through today: after the last refit, its values follow the last anchor's line (§6.4). So `_last` is today for SPY and for every candidate.
+- W3 then ends at `today − 730` for every candidate, and a KEPT candidate's first defined day is at least 14 years before today. W5 = `[max(s_first, max r_first + 730), today]` therefore holds the W3 of each member, and is never shorter than 10 years.
+- F's INSUFFICIENT_OVERLAP is tested where it can arise: `analysis.step5` on members of different spans (prompt 4). Here a test only checks that the job stores whatever status step 5 gives.
+- It would arise if one-sided series ended at their last release day instead of today. That would change W3 and W5 for every series, so it is not done without the owner.
+
+## Result
+
+- `.venv/bin/python -m pytest -q` (Linux VM, Python 3.13, the locked package versions): 476 passed, in about 35 s. New: 39 in `tests/test_jobs.py` (2.4 s), 2 in `tests/test_compute.py` and 6 in `tests/test_bench.py` (4 s together), 7 in `tests/test_pit.py`; plus `tests/fakes.py`.
+- AC-9: the first fetch sets both start days (fetch_start 1993-10-28 and analysis_start 1996-10-28 for a first fetch on 2026-10-28), requests SPY and both FRED series from fetch_start, computes, and stores a curve for SPY and each candidate; the start days stay a year later.
+- AC-10: an up-to-date fetch asks Tiingo's meta and FRED's series metadata only, runs no pool task, ends UP_TO_DATE, and keeps `computed_at`.
+- AC-11: SPY's prices from 7 days before the latest stored day, FRED's first releases from 400 days before; only new days are inserted, other values for stored days are ignored, and a compute follows.
+- AC-12: a failing series keeps its data and its status, with `last_fetch_error` and SERIES_FAILED, and a later success clears the error; SPY without data ends NO_SPY_DATA without a compute; with the real clients, an empty key gives MISSING_KEY to each series of its source, before any request.
+- AC-13: every start method is refused while a job runs, and N and the selection stay; progress goes through FETCH, SMOOTH, STEP3, STEP5 and SAVE with counts and series; a shutdown during a fetch keeps the inserted observations and the previous results, and so does one during a compute; REFIT_F sends step 5 alone to the pool and keeps the curves.
+- AC-14, job part: one fetch gives KEPT, NOT_LEADING, AT_BOUNDARY, INSUFFICIENT_HISTORY (3 years of data), DISCONTINUED (stale, not in F), INVALID_VALUES (with its event, and no curve), PENDING (no observations) and FETCH_FAILED; F's NO_MEMBERS and OK, and the stored INSUFFICIENT_OVERLAP; STATUS_CHANGED when a year passes without releases.
+- AC-15: §4.4's form for units in Percent, positive values, and a negative value; UNSUPPORTED_FREQUENCY and UNKNOWN_SERIES store nothing; MISSING_KEY without the FRED key; a series added before the first fetch waits for it; a USER series goes with its curve, payload entry and F membership; a catalog series stays; a series that left the catalog leaves the next compute.
+- AC-16: an unchecked member stays out after a restart; a series that becomes KEPT joins F.
+- AC-22, determinism: with the real smoothing and analysis on 2.5 years of weekly data (warm-up, shifts and window patched down), a fetch's compute and a recompute give bit-identical curves and equal payloads, with a KEPT series and F OK. The workers run in a spawned pool and return what they return in-process.
+- `python -m spylead.bench` was not run here (CLAUDE.md). Its data generator, its timing through a small compute with stand-ins, and its report are tested.
+- Mutation checks, each applied to a copy of the repository outside it, with the jobs, compute and bench tests run against the copy. All 17 were caught:
+  - no SPY or FRED overlap, `last_updated` ignored, a compute when up to date, no NO_SPY_DATA, typical_lag over the new observations only, the first SPY fetch from today, the start days reset;
+  - no STATUS_CHANGED, no INTERRUPTED, a fetch error not recorded, an unredacted failure message;
+  - §4.4's form not re-evaluated, HTTP 400 not UNKNOWN_SERIES, annual series accepted;
+  - members that ignore the selection, a removed series kept in the payload.

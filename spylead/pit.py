@@ -41,6 +41,16 @@ class Observations:
         return Observations(self.obs_day[index], self.value[index], self.release_day[index], self.estimated[index])
 
 
+def joined(first: Observations, second: Observations) -> Observations:
+    """Both sets of observations in one: first's, then second's."""
+    return Observations(
+        np.concatenate((first.obs_day, second.obs_day)),
+        np.concatenate((first.value, second.value)),
+        np.concatenate((first.release_day, second.release_day)),
+        np.concatenate((first.estimated, second.estimated)),
+    )
+
+
 def date_to_day(date: datetime.date) -> int:
     return (date - EPOCH).days
 
@@ -220,6 +230,11 @@ FORMS = tuple(TRANSFORMS)
 def y_values(values: np.ndarray, form: str) -> np.ndarray:
     """y of SPEC.md §5.4: ln(value) for LOG, the value itself for LEVEL. Check has_invalid_values first."""
     return TRANSFORMS[form](np.asarray(values, dtype=float))
+
+
+def user_form(units: str, values: np.ndarray) -> str:
+    """The form of a series the owner adds (SPEC.md §4.4): LEVEL for units in "Percent" or a value ≤ 0, else LOG."""
+    return "LEVEL" if "Percent" in units or (np.asarray(values) <= 0).any() else "LOG"
 
 
 def has_invalid_values(values: np.ndarray, form: str) -> bool:

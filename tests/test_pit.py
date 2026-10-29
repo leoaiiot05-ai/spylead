@@ -15,11 +15,13 @@ from spylead.pit import (
     estimate_release_days,
     fred_observations,
     has_invalid_values,
+    joined,
     known_points,
     parse_day,
     tiingo_observations,
     today_at,
     typical_lag,
+    user_form,
     utc_text,
     y_values,
     years_before,
@@ -465,3 +467,26 @@ def test_the_catalog_accepts_exactly_the_forms_of_section_5_4():
 def test_an_unknown_form_is_refused():
     with pytest.raises(KeyError):
         y_values(np.array([1.0]), "SQRT")
+
+
+@pytest.mark.parametrize(
+    ("units", "values", "form"),
+    [
+        ("Percent", [1.0, 2.0], "LEVEL"),
+        ("Percent Change from Year Ago", [1.0], "LEVEL"),
+        ("Index 2015=100", [101.5, 99.0], "LOG"),
+        ("Billions of Dollars", [5.0, 0.0], "LEVEL"),
+        ("Index", [3.0, -0.5], "LEVEL"),
+        ("Index", [], "LOG"),
+    ],
+    ids=["percent", "percent-change", "positive", "a-zero", "a-negative", "no-values-yet"],
+)
+def test_a_user_series_is_level_for_percent_units_or_a_value_that_is_not_positive(units, values, form):
+    assert user_form(units, np.array(values)) == form
+
+
+def test_joined_observations_keep_both_in_order():
+    first = observations([10, 20], [100, 120], [True, False])
+    second = observations([15], [130])
+    assert columns(joined(first, second)) == ([10, 20, 15], [1.0, 2.0, 1.0], [100, 120, 130], [True, False, False])
+    assert columns(joined(second, observations([], []))) == columns(second)
