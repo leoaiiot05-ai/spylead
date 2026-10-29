@@ -60,3 +60,13 @@
 ## Deferred items (appended to TODO.md)
 
 None.
+
+## Result
+
+- `.venv/bin/python -m pytest -q` (Linux VM, Python 3.13, the locked package versions): 420 passed, 91 of them new in `tests/test_sources.py`, in about 0.3 s. No test opens a socket: a guard on `socket.socket.connect`, `connect_ex` and `socket.create_connection` fails any test that tries.
+- AC-12 (requests): the delays 2, 4 and 8 s, the fourth failure, Retry-After and its cap, one retry for 429, none for 400 to 404, FRED's pacing.
+- AC-17 (redaction): in 32 scenarios (each request's success, and seven kinds of failure for each request), neither key appears in an error text, its traceback or a log line, and no error text holds a URL. One scenario feeds aiohttp an error message that contains both keys.
+- Mutation checks, each applied to a copy of the repository outside it, with `tests/test_sources.py` run against the copy. All 12 were caught:
+  - Tiingo's key in the URL, the request logged unredacted, a redaction that stops early, aiohttp's error chained into the SourceError, the payload error kept as the cause;
+  - no FRED pacing, 4xx retried, 429 retried more than once, Retry-After uncapped, other retry delays, a 60 s timeout;
+  - the key checked only after a request.
