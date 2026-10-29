@@ -70,10 +70,19 @@ def years_before(day: int, years: int) -> int:
 
 def today_at(instant: datetime.datetime) -> int:
     """The date in America/New_York at `instant`, as a day: "today" of SPEC.md §3."""
+    return date_to_day(aware(instant).astimezone(NEW_YORK).date())
+
+
+def utc_text(instant: datetime.datetime) -> str:
+    """`instant` in UTC ISO 8601 to the second, such as 2026-10-28T14:03:11Z: how the database and the API write it."""
+    return aware(instant).astimezone(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def aware(instant: datetime.datetime) -> datetime.datetime:
     if instant.utcoffset() is None:
         # astimezone would read a naive instant as the PC's local time.
         raise ValueError("instant must carry a time zone")
-    return date_to_day(instant.astimezone(NEW_YORK).date())
+    return instant
 
 
 def fred_observations(payload: Any) -> Observations:

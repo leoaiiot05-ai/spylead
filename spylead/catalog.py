@@ -7,6 +7,7 @@ from spylead.config import ConfigError, check_table, read_toml
 from spylead.pit import FORMS
 
 NAME = re.compile(r"[A-Za-z0-9_]{1,40}")
+SPY_NAME = "SPY"
 # SPEC.md §11's pattern for FRED IDs: the ID goes into a FRED URL.
 FRED_ID = re.compile(r"[A-Z0-9_]{1,40}")
 FIELDS = {"name": str, "fred_id": str, "form": str, "default_lag_days": int, "title_en": str, "title_zh": str}
@@ -45,6 +46,9 @@ def load_catalog(path: Path) -> tuple[CatalogEntry, ...]:
 def check_entry(entry: CatalogEntry, where: str) -> None:
     if not NAME.fullmatch(entry.name):
         raise ConfigError(f"{where}name must match {NAME.pattern}")
+    if entry.name == SPY_NAME:
+        # SPY's own row shares the series table, keyed by name (SPEC.md §10).
+        raise ConfigError(f"{where}name {SPY_NAME} is reserved")
     if not FRED_ID.fullmatch(entry.fred_id):
         raise ConfigError(f"{where}fred_id must match {FRED_ID.pattern}")
     if entry.form not in FORMS:

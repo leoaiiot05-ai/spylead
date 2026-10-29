@@ -84,3 +84,13 @@
 ## Deferred items (appended to TODO.md)
 
 None.
+
+## Result
+
+- `.venv/bin/python -m pytest -q` (Linux VM, Python 3.13, the locked package versions): 329 passed, 41 of them new in `tests/test_store.py`, 6 in `tests/test_pit.py` and 1 in `tests/test_catalog.py`. The store tests take under a second; the locked-database test waits 0.2 s, the patched busy timeout, inside SQLite's own busy handler.
+- On this VM's local disk, WAL is on with `synchronous = NORMAL` (1) and `busy_timeout = 1000`. Whether the owner's exFAT drive accepts WAL shows in the log at the first start: the fallback logs one warning.
+- Mutation checks, each applied to a copy of the repository outside it, with `tests/test_store.py` run against the copy. All 13 were caught:
+  - observations overwritten on conflict, no data dropped for a changed FRED ID, an exclusion kept after a delete, the upsert clearing FRED's metadata, catalog rows kept after leaving the file, removal of any origin;
+  - the start days overwritten;
+  - no WAL fallback, synchronous left at FULL, the busy timeout ignored;
+  - a commit instead of a rollback after a failure, curves not replaced by a compute, events oldest first.

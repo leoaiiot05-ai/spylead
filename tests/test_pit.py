@@ -20,6 +20,7 @@ from spylead.pit import (
     tiingo_observations,
     today_at,
     typical_lag,
+    utc_text,
     y_values,
     years_before,
 )
@@ -259,6 +260,25 @@ def test_today_is_the_date_in_new_york(instant, expected):
 def test_today_refuses_an_instant_without_a_time_zone():
     with pytest.raises(ValueError):
         today_at(datetime.datetime(2026, 10, 29, 12, 0))
+
+
+@pytest.mark.parametrize(
+    ("instant", "expected"),
+    [
+        ("2026-10-28T14:03:11+00:00", "2026-10-28T14:03:11Z"),
+        ("2026-10-28T22:03:11.999+08:00", "2026-10-28T14:03:11Z"),
+        ("2026-10-28T10:03:11-04:00", "2026-10-28T14:03:11Z"),
+        ("2026-12-31T23:30:00-05:00", "2027-01-01T04:30:00Z"),
+    ],
+    ids=["utc", "taipei-with-milliseconds", "new-york-summer", "new-year-in-utc"],
+)
+def test_instants_are_written_in_utc_to_the_second(instant, expected):
+    assert utc_text(datetime.datetime.fromisoformat(instant)) == expected
+
+
+def test_an_instant_without_a_time_zone_is_not_written():
+    with pytest.raises(ValueError):
+        utc_text(datetime.datetime(2026, 10, 29, 12, 0))
 
 
 # typical_lag and estimated release days (SPEC.md §5.2)
