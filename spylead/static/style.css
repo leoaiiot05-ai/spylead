@@ -1,0 +1,572 @@
+/* spylead (SPEC.md §12): a dense research panel, legible on a phone at arm's length, in light and dark. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --text: #1c2026;
+  --muted: #5b6472;
+  --line: #d6dae0;
+  --accent: #1f5f99;
+  --accent-text: #ffffff;
+  --ok: #1c6b3a;
+  --warn-bg: #fff2cf;
+  --warn-line: #b7791f;
+  --warn-text: #4a3200;
+  --danger-bg: #fde4e4;
+  --danger-line: #c53030;
+  --danger-text: #6b1212;
+  /* The charts read their line colours here (app.js). */
+  --chart-raw: #8d96a3;
+  --chart-main: #1f5f99;
+  --chart-reference: #c2410c;
+  --chart-second: #7c3aed;
+  --chart-guide: #6b7280;
+  --gap: 12px;
+  --radius: 10px;
+  --tap: 44px;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171b;
+    --panel: #1c2026;
+    --text: #e5e8ec;
+    --muted: #9ba5b2;
+    --line: #2f353d;
+    --accent: #6aa8e6;
+    --accent-text: #0b1520;
+    --ok: #6fd39a;
+    --warn-bg: #3b2f10;
+    --warn-line: #d69e2e;
+    --warn-text: #ffe4a3;
+    --danger-bg: #3f1717;
+    --danger-line: #f56565;
+    --danger-text: #ffd1d1;
+    --chart-raw: #6c7582;
+    --chart-main: #6aaee8;
+    --chart-reference: #f6ad55;
+    --chart-second: #b794f4;
+    --chart-guide: #a0aec0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 max(var(--gap), env(safe-area-inset-right)) max(var(--gap), env(safe-area-inset-bottom))
+    max(var(--gap), env(safe-area-inset-left));
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+h3 {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 16px 0 8px;
+}
+
+p {
+  margin: 0;
+}
+
+.detail {
+  color: var(--muted);
+  font-size: 0.88em;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Controls: 44 px targets, and nothing that needs hover */
+
+button,
+input,
+output {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="password"],
+input:not([type]) {
+  min-height: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Status bar */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: max(10px, env(safe-area-inset-top)) 0 10px;
+  margin-bottom: var(--gap);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.bar-status {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+#last-job {
+  font-weight: 600;
+}
+
+#last-job[data-outcome="FAILED"],
+#last-job[data-outcome="INTERRUPTED"],
+#last-job[data-outcome="MISSING_KEY"],
+#last-job[data-outcome="NO_SPY_DATA"],
+#last-job[data-outcome="UNKNOWN_SERIES"],
+#last-job[data-outcome="UNSUPPORTED_FREQUENCY"] {
+  color: var(--danger-text);
+}
+
+.job {
+  margin-top: 4px;
+}
+
+.job progress {
+  width: 100%;
+  max-width: 22rem;
+  height: 8px;
+  accent-color: var(--accent);
+}
+
+.bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Banners: impossible to miss, and readable without colour */
+
+.banners {
+  display: grid;
+  gap: 8px;
+}
+
+.banners:has(.banner:not([hidden])) {
+  margin-bottom: var(--gap);
+}
+
+.banner {
+  padding: 12px 14px;
+  border: 2px solid var(--warn-line);
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 1.05rem;
+}
+
+.banner.danger {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+/* Panels */
+
+main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A flex item is as wide as its content by default: the table would widen the page instead of scrolling. */
+main > * {
+  min-width: 0;
+}
+
+.panel {
+  margin-bottom: var(--gap);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+/* Charts first on small screens (SPEC.md §12) */
+@media (max-width: 899px) {
+  #charts {
+    order: -1;
+  }
+}
+
+.login {
+  max-width: 26rem;
+  margin: 8vh auto;
+}
+
+.login form {
+  display: grid;
+  gap: 10px;
+}
+
+.error {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.n-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepper output {
+  min-width: 3.5em;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+#windows {
+  margin-top: 8px;
+}
+
+/* The candidate table scrolls inside its own box */
+
+.table-scroll {
+  /* Positioned, so the visually hidden header stays inside the box that scrolls. */
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  vertical-align: bottom;
+}
+
+th.number,
+td.number {
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+
+td.title {
+  min-width: 14rem;
+  max-width: 22rem;
+  white-space: normal;
+}
+
+td.status {
+  min-width: 15rem;
+  max-width: 24rem;
+  white-space: normal;
+}
+
+td .detail,
+.status-label,
+.fetch-error {
+  display: block;
+}
+
+tr[data-chart] {
+  cursor: pointer;
+}
+
+button.series-name {
+  min-height: var(--tap);
+  margin: -10px 0 -6px -8px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+span.series-name {
+  font-weight: 600;
+}
+
+tr[data-status="KEPT"] .status-label {
+  color: var(--ok);
+}
+
+.fetch-error {
+  margin-top: 4px;
+  color: var(--danger-text);
+}
+
+.check-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  margin: -10px 0;
+  cursor: pointer;
+}
+
+.check-target input,
+.log input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.add {
+  margin-top: 12px;
+}
+
+.add label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 20rem;
+  text-transform: uppercase;
+}
+
+.add-row input::placeholder {
+  text-transform: none;
+}
+
+/* Charts */
+
+.chart-panel summary,
+.group > summary {
+  min-height: var(--tap);
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.group > summary {
+  color: var(--muted);
+}
+
+.chart-tag {
+  margin-left: 0.4em;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.chart-note,
+.chart-members {
+  margin: 0 0 6px;
+}
+
+.chart-members {
+  padding-left: 1.2em;
+}
+
+.chart-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 6px;
+}
+
+.ranges {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.ranges button {
+  padding: 0 10px;
+}
+
+.log {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+.chart-message {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.chart {
+  width: 100%;
+  height: clamp(260px, 44vh, 460px);
+}
+
+/* Events */
+
+.events {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.events li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.event-head {
+  display: block;
+  font-weight: 600;
+}
+
+.events li[data-level="WARNING"] .event-head {
+  color: var(--warn-text);
+}
+
+.events li[data-level="ERROR"] .event-head {
+  color: var(--danger-text);
+}
+
+#events summary {
+  min-height: var(--tap);
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* A notice at the bottom of the screen, wherever the page is scrolled */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(32rem, calc(100% - 2 * var(--gap)));
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.25);
+  transform: translateX(-50%);
+}
+
+.toast p {
+  flex: 1;
+}
+
+.toast button {
+  border-color: transparent;
+  background: transparent;
+  font-size: 1.3rem;
+}

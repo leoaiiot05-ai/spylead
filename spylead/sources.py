@@ -26,6 +26,9 @@ TIMEOUT_S = 30
 FRED_INTERVAL_S = 0.5
 RETRY_DELAYS_S = (2, 4, 8)
 MAX_RETRY_AFTER_S = 60
+# The codes of SourceError (SPEC.md §8.3), for the UI's locales too. An HTTP error's code is HTTP_<status>.
+TIMEOUT, CONNECTION_FAILED, BAD_PAYLOAD, MISSING_KEY = "TIMEOUT", "CONNECTION_FAILED", "BAD_PAYLOAD", "MISSING_KEY"
+ERROR_CODES = (TIMEOUT, CONNECTION_FAILED, BAD_PAYLOAD, MISSING_KEY)
 # The value runs to the next parameter, the fragment, or the end of a URL quoted inside a message.
 API_KEY = re.compile(r"(api_key=)[^&#\s'\"]*", re.IGNORECASE)
 
@@ -35,7 +38,7 @@ Sleep = Callable[[float], Awaitable[None]]
 class SourceError(Exception):
     """A failed request (SPEC.md §8.3). The text is English and holds no URL and no key.
 
-    code: TIMEOUT, CONNECTION_FAILED, HTTP_<status>, BAD_PAYLOAD or MISSING_KEY.
+    code: one of ERROR_CODES, or HTTP_<status>.
     """
 
     def __init__(self, code: str, text: str) -> None:
@@ -82,7 +85,7 @@ class Source:
     async def get_json(self, url: str, params: dict[str, str] | None = None) -> Any:
         """The decoded JSON body of a GET request, after the retries of SPEC.md §8.4."""
         if not self.key:
-            raise SourceError("MISSING_KEY", f"the {self.name} API key is empty in config.toml")
+            raise SourceError(MISSING_KEY, f"the {self.name} API key is empty in config.toml")
         retries = 0
         rate_limited = False
         while True:
@@ -96,9 +99,9 @@ class Source:
                     retry_after = response.headers.get("Retry-After")
                     body = await response.text() if 200 <= status < 300 else None
             except TimeoutError:
-                error = SourceError("TIMEOUT", f"{self.name} did not answer within {TIMEOUT_S} s")
+                error = SourceError(TIMEOUT, f"{self.name} did not answer within {TIMEOUT_S} s")
             except aiohttp.ClientError:
-                error = SourceError("CONNECTION_FAILED", f"{self.name} could not be reached")
+                error = SourceError(CONNECTION_FAILED, f"{self.name} could not be reached")
             else:
                 log.debug("%s answered HTTP %d", self.name, status)
                 if body is not None:
@@ -185,14 +188,14 @@ def decode(name: str, body: str) -> Any:
     try:
         return json.loads(body)
     except ValueError:
-        raise SourceError("BAD_PAYLOAD", f"{name} sent a body that is not JSON") from None
+        raise SourceError(BAD_PAYLOAD, f"{name} sent a body that is not JSON") from None
 
 
 def translated(name: str, translate: Callable[[Any], Any], body: Any) -> Any:
     try:
         return translate(body)
     except PayloadError as error:
-        raise SourceError("BAD_PAYLOAD", f"{name} sent an unexpected body: {error}") from None
+        raise SourceError(BAD_PAYLOAD, f"{name} sent an unexpected body: {error}") from None
 
 
 def tiingo_end_day(body: Any) -> int:

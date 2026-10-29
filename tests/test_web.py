@@ -267,6 +267,28 @@ def test_every_response_carries_the_security_headers(app, path, kind):
     assert headers["Cache-Control"] == ("no-store" if kind.startswith("api") else "no-cache")
 
 
+@pytest.mark.parametrize(
+    ("path", "content_type"),
+    [
+        ("/", "text/html"),
+        ("/app.js", "text/javascript"),
+        ("/style.css", "text/css"),
+        ("/manifest.webmanifest", "application/manifest+json"),
+        ("/locales/zh-TW.json", "application/json"),
+        ("/icons/apple-touch-icon.png", "image/png"),
+        ("/vendor/echarts/echarts.min.js", "text/javascript"),
+    ],
+)
+def test_static_files_are_served_with_their_content_types(app, path, content_type):
+    # nosniff makes a browser refuse a script or a stylesheet served with another type.
+    async def check(client):
+        response = await client.get(path)
+        await response.read()
+        return response.status, response.content_type
+
+    assert served(app, check) == (200, content_type)
+
+
 def test_an_unauthorized_answer_carries_the_security_headers(app):
     async def check(client):
         response = await client.get("/api/state")

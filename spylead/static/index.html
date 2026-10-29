@@ -2,10 +2,150 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f5f7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14171b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="spylead">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>spylead</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css">
+<script src="/vendor/echarts/echarts.min.js" defer></script>
+<script src="/app.js" defer></script>
 </head>
 <body>
-<p>spylead is running. Its interface is not built yet.</p>
+<header class="bar">
+  <h1 class="brand">spylead</h1>
+  <div id="bar-status" class="bar-status" aria-live="polite" hidden>
+    <p id="last-job"></p>
+    <p id="last-job-detail" class="detail" hidden></p>
+    <div id="job" class="job" hidden>
+      <p id="job-text"></p>
+      <progress id="job-progress" max="1" value="0"></progress>
+    </div>
+  </div>
+  <div class="bar-actions">
+    <button type="button" id="fetch" class="primary" data-i18n="bar.fetch" hidden></button>
+    <button type="button" id="language" data-i18n="language.other"></button>
+    <button type="button" id="logout" data-i18n="bar.logout" hidden></button>
+  </div>
+</header>
+
+<div class="banners">
+  <p id="banner-stale" class="banner danger" role="alert" hidden><strong data-i18n="banner.stale"></strong> <span id="banner-stale-text"></span></p>
+  <p id="banner-tiingo" class="banner" role="alert" hidden><strong data-i18n="banner.missingKey"></strong> <span data-i18n="banner.tiingo"></span></p>
+  <p id="banner-fred" class="banner" role="alert" hidden><strong data-i18n="banner.missingKey"></strong> <span data-i18n="banner.fred"></span></p>
+  <p id="banner-empty" class="banner" role="status" hidden><strong data-i18n="banner.noData"></strong> <span id="banner-empty-text"></span></p>
+</div>
+
+<section id="login" class="panel login" hidden>
+  <form id="login-form">
+    <h2 data-i18n="login.title"></h2>
+    <label for="token" data-i18n="login.token"></label>
+    <input id="token" name="token" type="password" autocomplete="current-password" required>
+    <p class="detail" data-i18n="login.hint"></p>
+    <p id="login-error" class="error" role="alert" hidden></p>
+    <button type="submit" id="login-submit" class="primary" data-i18n="login.submit"></button>
+  </form>
+</section>
+
+<main id="main" hidden>
+  <section id="settings" class="panel">
+    <h2 data-i18n="settings.title"></h2>
+    <div class="n-row">
+      <span id="n-label" data-i18n="settings.label"></span>
+      <div class="stepper" role="group" aria-labelledby="n-label">
+        <button type="button" id="n-down" data-i18n-aria="settings.decrease">−</button>
+        <output id="n-value"></output>
+        <button type="button" id="n-up" data-i18n-aria="settings.increase">+</button>
+      </div>
+      <button type="button" id="n-apply" data-i18n="settings.apply"></button>
+    </div>
+    <p id="windows" class="detail" hidden></p>
+  </section>
+
+  <section id="candidates" class="panel">
+    <h2 data-i18n="table.title"></h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="col.name"></th>
+            <th data-i18n="col.title"></th>
+            <th data-i18n="col.fred"></th>
+            <th data-i18n="col.frequency"></th>
+            <th data-i18n="col.form"></th>
+            <th data-i18n="col.lastObs"></th>
+            <th data-i18n="col.lastRelease"></th>
+            <th class="number" data-i18n="col.estimated"></th>
+            <th class="number" data-i18n="col.aStar"></th>
+            <th class="number" data-i18n="col.beta"></th>
+            <th class="number" data-i18n="col.score"></th>
+            <th class="number" data-i18n="col.scoreOos"></th>
+            <th data-i18n="col.status"></th>
+            <th data-i18n="col.inF"></th>
+            <th><span class="visually-hidden" data-i18n="col.remove"></span></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <form id="add-form" class="add">
+      <label for="fred-id" data-i18n="add.label"></label>
+      <div class="add-row">
+        <input id="fred-id" name="fred_id" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" data-i18n-placeholder="add.placeholder">
+        <button type="submit" id="add" data-i18n="add.submit"></button>
+      </div>
+    </form>
+  </section>
+
+  <section id="charts" class="charts">
+    <h2 class="visually-hidden" data-i18n="charts.title"></h2>
+    <div id="main-charts"></div>
+    <h3 id="leading-title" data-i18n="charts.leading" hidden></h3>
+    <div id="leading-charts"></div>
+    <details id="other-group" class="group" hidden>
+      <summary data-i18n="charts.other"></summary>
+      <div id="other-charts"></div>
+    </details>
+  </section>
+
+  <section id="events" class="panel">
+    <details>
+      <summary data-i18n="events.title"></summary>
+      <p id="events-empty" class="detail" data-i18n="events.empty" hidden></p>
+      <ol id="event-list" class="events"></ol>
+    </details>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="alert" hidden>
+  <p id="toast-text"></p>
+  <button type="button" id="toast-close" data-i18n-aria="toast.close">×</button>
+</div>
+
+<template id="chart-panel">
+  <details class="panel chart-panel">
+    <summary><span class="chart-title"></span> <span class="chart-tag"></span></summary>
+    <p class="chart-note detail" hidden></p>
+    <ul class="chart-members detail" hidden></ul>
+    <div class="chart-tools">
+      <div class="ranges" role="group">
+        <button type="button" data-years="1" data-i18n="range.1y"></button>
+        <button type="button" data-years="5" data-i18n="range.5y"></button>
+        <button type="button" data-years="10" data-i18n="range.10y"></button>
+        <button type="button" data-years="0" data-i18n="range.all"></button>
+      </div>
+      <label class="log" hidden><input type="checkbox" class="log-axis"> <span data-i18n="chart.log"></span></label>
+    </div>
+    <p class="chart-message" hidden></p>
+    <div class="chart"></div>
+  </details>
+</template>
 </body>
 </html>
