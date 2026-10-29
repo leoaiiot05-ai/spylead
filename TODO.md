@@ -21,6 +21,7 @@ Nothing here is in scope for v1. Do not build any of it without being asked. App
 - [ ] Cache the one-sided anchors if compute time grows. Today a full compute fits within the budget.
 - [ ] Carry IRLS weights across refits (the previous refit's weights, 1 for new points) if the bench shows the one-sided refits dominate the compute. Today each refit's search starts from unit weights. Seam: `smoothing.refit_anchors`.
 - [ ] A significance test for leads (for example a block bootstrap), beyond the out-of-sample score.
+- [ ] Guard steps 3 and 5 against singular normal equations: an indicator that is constant over its window, or two members that are affine copies of each other. Today `numpy.linalg.solve` raises LinAlgError, or the fit is meaningless. Seam: `analysis.lad`.
 
 ## Interface
 
