@@ -5,18 +5,17 @@ The data lives in a temporary database: the bench never reads data/ and never fe
 import asyncio
 import contextlib
 import datetime
-import os
 import sys
 import tempfile
 import time
 from collections.abc import AsyncIterator, Callable, Sequence
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor
 from pathlib import Path
 
 import numpy as np
 
 from spylead.catalog import SPY_NAME, CatalogEntry, load_catalog
-from spylead.jobs import COMPUTED, PHASES, Jobs
+from spylead.jobs import COMPUTED, PHASES, WORKERS, Jobs, worker_pool
 from spylead.pit import Observations, today_at, years_before
 from spylead.store import Store
 
@@ -113,8 +112,7 @@ def main() -> int:
     def clock() -> datetime.datetime:
         return datetime.datetime.now(datetime.UTC)
 
-    workers = max(1, (os.cpu_count() or 1) - 1)
-    with tempfile.TemporaryDirectory() as folder, ProcessPoolExecutor(workers) as pool:
+    with tempfile.TemporaryDirectory() as folder, worker_pool() as pool:
         store = Store.open(Path(folder) / "bench.db", clock)
         try:
             store.sync_catalog(catalog)
@@ -124,7 +122,7 @@ def main() -> int:
             total = time.perf_counter() - started
         finally:
             store.close()
-    print(report(timings, total, workers, len(catalog)))
+    print(report(timings, total, WORKERS, len(catalog)))
     return 0 if total <= BUDGET_S else 1
 
 

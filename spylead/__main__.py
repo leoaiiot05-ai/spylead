@@ -6,11 +6,9 @@ import datetime
 import functools
 import logging
 import logging.handlers
-import os
 import sys
 import traceback
 from collections.abc import Awaitable, Callable, Sequence
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import IO
 
@@ -18,7 +16,7 @@ from aiohttp import web
 
 from spylead.catalog import CatalogEntry, load_catalog
 from spylead.config import Config, ConfigError, load_config
-from spylead.jobs import Jobs, open_sources
+from spylead.jobs import Jobs, open_sources, worker_pool
 from spylead.sources import redact
 from spylead.store import Store
 from spylead.web import create_app
@@ -44,14 +42,18 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 def setup_logging(log_dir: Path) -> None:
     log_dir.mkdir(exist_ok=True)
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
     logfile = logging.handlers.RotatingFileHandler(
         log_dir / "spylead.log", maxBytes=LOG_BYTES, backupCount=LOG_BACKUPS, encoding="utf-8"
     )
     logfile.setLevel(logging.DEBUG)
+    handlers: list[logging.Handler] = [logfile]
+    # pythonw.exe, which the autostart runs, has no console: there sys.stderr is None.
+    if sys.stderr is not None:
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        handlers.append(console)
     root = logging.getLogger()
-    for handler in (console, logfile):
+    for handler in handlers:
         handler.setFormatter(logging.Formatter(LOG_FORMAT))
         root.addHandler(handler)
     root.setLevel(logging.INFO)
@@ -102,7 +104,7 @@ async def serve(
         store = Store.open(data_dir / "spylead.db", now)
         stack.callback(store.close)
         store.sync_catalog(catalog)
-        pool = ProcessPoolExecutor(max(1, (os.cpu_count() or 1) - 1))
+        pool = worker_pool()
         stack.callback(pool.shutdown, wait=True, cancel_futures=True)
         jobs = Jobs(store, catalog, pool, now, functools.partial(open_sources, config, asyncio.sleep))
         stack.push_async_callback(jobs.shutdown)

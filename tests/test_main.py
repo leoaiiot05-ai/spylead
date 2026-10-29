@@ -4,6 +4,7 @@ import logging
 import logging.handlers
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -15,7 +16,7 @@ from spylead import __main__ as spylead_main
 from spylead.__main__ import main, setup_logging, take_lock
 from spylead.catalog import load_catalog
 from spylead.config import Config
-from spylead.jobs import Jobs
+from spylead.jobs import Jobs, worker_pool
 from spylead.store import Store
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -168,6 +169,8 @@ def test_serve_listens_on_127_0_0_1_only_and_shuts_down_in_order(monkeypatch, tm
     ]:
         monkeypatch.setattr(owner, name, recording(getattr(owner, name), label, order))
     addresses = []
+    pools = []
+    monkeypatch.setattr(spylead_main, "worker_pool", recorded_pool(pools))
 
     async def until(runner):
         addresses.extend(runner.addresses)
@@ -179,6 +182,21 @@ def test_serve_listens_on_127_0_0_1_only_and_shuts_down_in_order(monkeypatch, tm
     assert [host for host, _ in addresses] == ["127.0.0.1"]
     assert order == ["ready", "stop accepting requests", "interrupt the job", "shut the pool down", "close the store"]
     assert (tmp_path / "spylead.db").exists()
+    assert len(pools) == 1
+
+
+def test_pool_workers_leave_ctrl_c_to_the_main_process():
+    # A console sends Ctrl+C to every process attached to it; the shutdown of SPEC.md §15 must reach the pool first.
+    with worker_pool() as pool:
+        assert pool.submit(signal.getsignal, signal.SIGINT).result(timeout=120) == signal.SIG_IGN
+
+
+def recorded_pool(pools):
+    def make():
+        pools.append(worker_pool())
+        return pools[-1]
+
+    return make
 
 
 def test_ctrl_c_cancels_serve_which_shuts_down_in_order(monkeypatch, tmp_path):
@@ -264,6 +282,18 @@ def test_file_takes_spylead_debug_and_rotates_console_takes_info(tmp_path, capsy
     assert "library detail" not in log_text
     console = capsys.readouterr().err
     assert "phase summary" in console and "refit detail" not in console
+
+
+def test_without_a_console_logging_goes_to_the_file_only(monkeypatch, tmp_path):
+    # pythonw.exe, which the autostart runs, sets sys.stderr to None.
+    monkeypatch.setattr(sys, "stderr", None)
+    with restored_logging():
+        before = set(logging.getLogger().handlers)
+        setup_logging(tmp_path / "logs")
+        added = [handler for handler in logging.getLogger().handlers if handler not in before]
+        logging.getLogger("spylead.jobs").info("phase summary")
+    assert [type(handler) for handler in added] == [logging.handlers.RotatingFileHandler]
+    assert "phase summary" in (tmp_path / "logs" / "spylead.log").read_text(encoding="utf-8")
 
 
 def test_example_config_fails_on_the_placeholder_token_without_network(tmp_path):

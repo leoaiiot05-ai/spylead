@@ -8,10 +8,13 @@ import dataclasses
 import datetime
 import functools
 import logging
+import multiprocessing
+import os
+import signal
 import time
 import traceback
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
-from concurrent.futures import Executor
+from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,6 +50,7 @@ SPY_OVERLAP_DAYS = 7
 FRED_OVERLAP_DAYS = 400
 ANNUAL = "A"
 UNKNOWN_SERIES_CODES = ("HTTP_400", "HTTP_404")  # FRED answers an unknown series_id with 400
+WORKERS = max(1, (os.cpu_count() or 1) - 1)  # SPEC.md §9
 
 FETCH, RECOMPUTE, REFIT_F, ADD_SERIES, REMOVE_SERIES = "FETCH", "RECOMPUTE", "REFIT_F", "ADD_SERIES", "REMOVE_SERIES"
 KINDS = (FETCH, RECOMPUTE, REFIT_F, ADD_SERIES, REMOVE_SERIES)
@@ -101,6 +105,20 @@ async def open_sources(config: Config, sleep: Callable[[float], Awaitable[None]]
     """The job's one ClientSession (SPEC.md §8.4), with both clients on it."""
     async with aiohttp.ClientSession() as session:
         yield Tiingo(session, config.tiingo_api_key, sleep), Fred(session, config.fred_api_key, sleep)
+
+
+def worker_pool() -> ProcessPoolExecutor:
+    """The process pool of SPEC.md §9, whose workers leave Ctrl+C to the main process.
+
+    A console sends Ctrl+C to every process attached to it. Workers that took it would die at once, before the
+    shutdown of §15 interrupts the job and then shuts the pool down. Workers start by spawning on every system, as
+    Windows must: forking a process that runs threads can deadlock.
+    """
+    return ProcessPoolExecutor(WORKERS, mp_context=multiprocessing.get_context("spawn"), initializer=ignore_interrupts)
+
+
+def ignore_interrupts() -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 def smooth_series(release_days: np.ndarray, y: np.ndarray, n_per_year: float, today: int) -> tuple[OneSided, Reference]:

@@ -14,7 +14,8 @@
 3. `run.bat`: from its own folder, `.venv\Scripts\python.exe -m spylead --config config.toml` in the console; on a non-zero exit it pauses, so that a config error or "another process holds the lock" stays readable.
 4. §15 against `__main__.py`:
    - startup order, the lock, logging, and shutdown in §15's order hold (prompt 8's tests);
-   - gap: under `pythonw.exe`, which the autostart uses, `sys.stderr` is None, so the console handler fails on every record and logging swallows the error each time. The console handler is now added only when there is a console; the log file is unchanged.
+   - gap: under `pythonw.exe`, which the autostart uses, `sys.stderr` is None, so the console handler fails on every record and logging swallows the error each time. The console handler is now added only when there is a console; the log file is unchanged;
+   - gap: a console sends Ctrl+C to every process attached to it, the pool's workers included (a terminal sends SIGINT to the whole foreground group). The workers died at once, with tracebacks, before §15's shutdown could interrupt the job and then shut the pool down. `jobs.worker_pool()` now makes them ignore SIGINT, and the app and the bench both take their pool from it. It also starts its workers by spawning on every system, as Windows must: forking a process that runs threads can deadlock, and the tests now take the PC's path on Linux too.
 5. `README.md`, for the owner, from a clean PC to the first charts: what spylead does and does not do; prerequisites and the two keys (§19); install from `pylock.toml`; configure; run; the first Fetch Data, "already up to date" and compute times; reading the results; Edge as an app; iPhone and iPad through Tailscale Serve, and why never Funnel or a public port; autostart, the fixed drive letter, and backups; the bench and §16.3's checks; §17's limitations; troubleshooting.
 6. Tests, `tests/test_operations.py`, without running PowerShell:
    - `install-autostart.ps1` exists, is ASCII, requires PowerShell 5.1, and uses no syntax PowerShell 7 added (`??`, `?.`, `&&`, `||`, a ternary, `-Parallel`, `Join-Path` with two child paths);
@@ -22,7 +23,7 @@
    - the launcher it writes waits up to 10 minutes and starts `pythonw.exe -m spylead --config config.toml` in the project folder;
    - `run.bat` exists, is ASCII, runs from its own folder and starts the venv's `python.exe -m spylead --config config.toml`;
    - the README covers each topic the prompt lists, and every command it gives names files that exist;
-   - `tests/test_main.py`: without a console, logging goes to the file only.
+   - `tests/test_main.py`: without a console, logging goes to the file only; the pool's workers ignore SIGINT, and `serve` takes its pool from `worker_pool()`.
    - AC-21 still holds: prompt 8's tests in `tests/test_main.py` are unchanged and pass.
 7. `.venv/Scripts/python -m pytest -q`.
 
@@ -43,7 +44,22 @@
 ## Refactor seams
 
 - **The launcher's text** is built in one function of `install-autostart.ps1`; the task and the shortcut both call `powershell.exe` with the same arguments.
+- **The pool** comes from `jobs.worker_pool()`, for the app and the bench alike.
 
 ## Deferred items (appended to TODO.md)
 
 - A way to stop an autostarted spylead gracefully, with the shutdown of §15, instead of ending `pythonw.exe` (for example a stop button for the owner, or `run.bat` stopping the hidden process first).
+
+## Result
+
+- `.venv/bin/python -m pytest -q` (Linux VM, Python 3.13, the locked package versions): 707 passed, in about 42 s, with no warning. New: 35 in `tests/test_operations.py`, 2 in `tests/test_main.py`.
+- **PowerShell** is not on this VM, so `install-autostart.ps1` has not run: its tests read it as text. Its first run is step 5 of §16.3, on the PC.
+- §15:
+  - startup order, the lock (exit code 3 before the database or the port), the log file, and the shutdown order are prompt 8's tests, unchanged and passing (AC-21);
+  - without a console, logging goes to the file only;
+  - in a scratch run, SIGINT sent to the whole process group while a worker task ran: with `worker_pool()`, the task finished and the main process shut the pool down in order; with a plain `ProcessPoolExecutor`, the worker took the signal and the task failed. A scratch script that starts the pool needs the `if __name__ == "__main__":` guard, as `spylead/__main__.py` and `spylead/bench.py` have.
+- Mutation checks, each applied to a copy of the repository outside it, with `tests/test_operations.py` and `tests/test_main.py` run against the copy. All 20 were caught:
+  - the console handler added without a console; workers that take Ctrl+C; `serve` building its own pool;
+  - in the autostart script: no `#Requires`, a PowerShell 7 operator, a non-ASCII character, another task name, the launcher on the external drive, a 5-minute wait, `python.exe` instead of `pythonw.exe`, no fallback, `-Remove` keeping the task, quotes not doubled;
+  - in `run.bat`: the global `python`, no `cd`;
+  - in the README: no Funnel warning, a limitation dropped, a status left unexplained, the wrong port behind Tailscale Serve, a command naming a missing file.
