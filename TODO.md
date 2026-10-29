@@ -28,6 +28,7 @@ Nothing here is in scope for v1. Do not build any of it without being asked. App
 - [ ] Offline mode (service worker).
 - [ ] Native iOS or Windows apps. The JSON API is the seam.
 - [ ] A notification when a fetch finds new data.
+- [ ] Browser tests of `app.js` (for example Playwright), which need a dev dependency. Today pytest checks the static files, and the UI checklist the behaviour.
 
 ## Operations
 
