@@ -15,11 +15,15 @@ from spylead.pit import (
     estimate_release_days,
     fred_observations,
     has_invalid_values,
+    joined,
     known_points,
+    original_values,
     parse_day,
     tiingo_observations,
     today_at,
     typical_lag,
+    user_form,
+    utc_text,
     y_values,
     years_before,
 )
@@ -261,6 +265,25 @@ def test_today_refuses_an_instant_without_a_time_zone():
         today_at(datetime.datetime(2026, 10, 29, 12, 0))
 
 
+@pytest.mark.parametrize(
+    ("instant", "expected"),
+    [
+        ("2026-10-28T14:03:11+00:00", "2026-10-28T14:03:11Z"),
+        ("2026-10-28T22:03:11.999+08:00", "2026-10-28T14:03:11Z"),
+        ("2026-10-28T10:03:11-04:00", "2026-10-28T14:03:11Z"),
+        ("2026-12-31T23:30:00-05:00", "2027-01-01T04:30:00Z"),
+    ],
+    ids=["utc", "taipei-with-milliseconds", "new-york-summer", "new-year-in-utc"],
+)
+def test_instants_are_written_in_utc_to_the_second(instant, expected):
+    assert utc_text(datetime.datetime.fromisoformat(instant)) == expected
+
+
+def test_an_instant_without_a_time_zone_is_not_written():
+    with pytest.raises(ValueError):
+        utc_text(datetime.datetime(2026, 10, 29, 12, 0))
+
+
 # typical_lag and estimated release days (SPEC.md §5.2)
 
 
@@ -445,3 +468,37 @@ def test_the_catalog_accepts_exactly_the_forms_of_section_5_4():
 def test_an_unknown_form_is_refused():
     with pytest.raises(KeyError):
         y_values(np.array([1.0]), "SQRT")
+
+
+@pytest.mark.parametrize(
+    ("units", "values", "form"),
+    [
+        ("Percent", [1.0, 2.0], "LEVEL"),
+        ("Percent Change from Year Ago", [1.0], "LEVEL"),
+        ("Index 2015=100", [101.5, 99.0], "LOG"),
+        ("Billions of Dollars", [5.0, 0.0], "LEVEL"),
+        ("Index", [3.0, -0.5], "LEVEL"),
+        ("Index", [], "LOG"),
+    ],
+    ids=["percent", "percent-change", "positive", "a-zero", "a-negative", "no-values-yet"],
+)
+def test_a_user_series_is_level_for_percent_units_or_a_value_that_is_not_positive(units, values, form):
+    assert user_form(units, np.array(values)) == form
+
+
+def test_joined_observations_keep_both_in_order():
+    first = observations([10, 20], [100, 120], [True, False])
+    second = observations([15], [130])
+    assert columns(joined(first, second)) == ([10, 20, 15], [1.0, 2.0, 1.0], [100, 120, 130], [True, False, False])
+    assert columns(joined(second, observations([], []))) == columns(second)
+
+
+@pytest.mark.parametrize("form", FORMS)
+def test_original_values_undo_each_form(form):
+    values = np.array([0.5, 2.0, 1234.5678])
+    np.testing.assert_allclose(original_values(y_values(values, form), form), values, rtol=1e-15)
+
+
+def test_original_values_keep_nan():
+    assert np.isnan(original_values(np.array([np.nan]), "LOG")).all()
+    assert original_values(np.array([np.nan, -0.5]), "LEVEL")[1] == -0.5

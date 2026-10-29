@@ -1,13 +1,23 @@
+import asyncio
 import contextlib
 import logging
 import logging.handlers
 import os
 import shutil
+import signal
 import subprocess
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from spylead.__main__ import main, setup_logging
+from aiohttp import web
+
+from spylead import __main__ as spylead_main
+from spylead.__main__ import main, setup_logging, take_lock
+from spylead.catalog import load_catalog
+from spylead.config import Config
+from spylead.jobs import Jobs, worker_pool
+from spylead.store import Store
 
 ROOT = Path(__file__).resolve().parents[1]
 TOKEN = "Sentinel-token-0123456789"
@@ -35,6 +45,15 @@ def refuse_network(event, args):
 sys.addaudithook(refuse_network)
 pathlib.Path(__file__).with_name("guard-active").touch()
 """
+# A child that takes the lock, says so, and waits to be killed.
+HOLD_LOCK = """\
+import pathlib, sys, time
+from spylead.__main__ import take_lock
+
+lock = take_lock(pathlib.Path(sys.argv[1]))
+print("locked" if lock else "refused", flush=True)
+time.sleep(600)
+"""
 
 
 @contextlib.contextmanager
@@ -60,18 +79,177 @@ def write_config(folder):
     return path
 
 
-def test_valid_config_logs_warnings_and_exits_not_implemented(tmp_path, capsys):
+def test_a_valid_config_takes_the_lock_then_serves(monkeypatch, tmp_path, capsys):
     config = write_config(tmp_path)
+    served = []
+
+    async def serve(config, catalog, data_dir):
+        # The lock is held while the app serves.
+        assert take_lock(data_dir / "spylead.lock") is None
+        served.append((config.port, len(catalog), data_dir))
+
+    monkeypatch.setattr(spylead_main, "serve", serve)
     with restored_logging():
-        assert main(["--config", str(config)]) == 1
+        assert main(["--config", str(config)]) == 0
+    assert served == [(8090, 18, tmp_path / "data")]
     log_text = (tmp_path / "logs" / "spylead.log").read_text(encoding="utf-8")
     assert "INFO spylead: Loaded config.toml and catalog.toml: 18 candidates" in log_text
     assert "WARNING spylead: fred.api_key is empty" in log_text
     assert "WARNING spylead: tiingo.api_key is empty" in log_text
-    assert "INFO spylead: spylead is not implemented yet" in log_text
-    console = capsys.readouterr().err
-    assert "spylead is not implemented yet" in console
-    assert TOKEN not in log_text + console
+    assert "INFO spylead: spylead stopped" in log_text
+    assert TOKEN not in log_text + capsys.readouterr().err
+    # Released at the end.
+    lock = take_lock(tmp_path / "data" / "spylead.lock")
+    assert lock is not None
+    lock.close()
+
+
+def test_ctrl_c_stops_cleanly_and_a_failure_is_logged_redacted(monkeypatch, tmp_path):
+    config = write_config(tmp_path)
+
+    async def interrupted(config, catalog, data_dir):
+        raise KeyboardInterrupt
+
+    async def failing(config, catalog, data_dir):
+        raise OSError("https://api.stlouisfed.org/fred/series?api_key=SECRETKEY0123456789")
+
+    monkeypatch.setattr(spylead_main, "serve", interrupted)
+    with restored_logging():
+        assert main(["--config", str(config)]) == 0
+    monkeypatch.setattr(spylead_main, "serve", failing)
+    with restored_logging():
+        assert main(["--config", str(config)]) == 1
+    log_text = (tmp_path / "logs" / "spylead.log").read_text(encoding="utf-8")
+    assert "spylead stopped on an error" in log_text and "api_key=***" in log_text
+    assert "SECRETKEY0123456789" not in log_text
+
+
+def test_a_second_process_exits_before_opening_the_database_or_the_port(tmp_path):
+    config = write_config(tmp_path)
+    (tmp_path / "data").mkdir()
+    holder = take_lock(tmp_path / "data" / "spylead.lock")
+    guard = tmp_path / "guard"
+    guard.mkdir()
+    (guard / "sitecustomize.py").write_text(NO_NETWORK, encoding="utf-8")
+    result = run_spylead(config, guard)
+    holder.close()
+    assert (guard / "guard-active").exists()
+    assert result.returncode == 3, result.stderr
+    assert "Another spylead process holds" in result.stderr
+    assert sorted(path.name for path in (tmp_path / "data").iterdir()) == ["spylead.lock"]
+
+
+def test_a_lock_left_by_a_killed_process_does_not_block_a_restart(tmp_path):
+    lock_path = tmp_path / "spylead.lock"
+    holder = subprocess.Popen(
+        [sys.executable, "-c", HOLD_LOCK, str(lock_path)],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline() == "locked\n"
+        assert take_lock(lock_path) is None
+    finally:
+        holder.kill()
+        holder.wait(timeout=60)
+    lock = take_lock(lock_path)
+    assert lock is not None
+    lock.close()
+    assert lock_path.exists()
+
+
+def test_serve_listens_on_127_0_0_1_only_and_shuts_down_in_order(monkeypatch, tmp_path):
+    order = []
+    for owner, name, label in [
+        (web.AppRunner, "cleanup", "stop accepting requests"),
+        (Jobs, "shutdown", "interrupt the job"),
+        (ProcessPoolExecutor, "shutdown", "shut the pool down"),
+        (Store, "close", "close the store"),
+    ]:
+        monkeypatch.setattr(owner, name, recording(getattr(owner, name), label, order))
+    addresses = []
+    pools = []
+    monkeypatch.setattr(spylead_main, "worker_pool", recorded_pool(pools))
+
+    async def until(runner):
+        addresses.extend(runner.addresses)
+        order.append("ready")
+
+    config = Config(port=0, token=TOKEN, fred_api_key="", tiingo_api_key="")
+    catalog = load_catalog(ROOT / "catalog.toml")
+    asyncio.run(spylead_main.serve(config, catalog, tmp_path, until))
+    assert [host for host, _ in addresses] == ["127.0.0.1"]
+    assert order == ["ready", "stop accepting requests", "interrupt the job", "shut the pool down", "close the store"]
+    assert (tmp_path / "spylead.db").exists()
+    assert len(pools) == 1
+
+
+def test_pool_workers_leave_ctrl_c_to_the_main_process():
+    # A console sends Ctrl+C to every process attached to it; the shutdown of SPEC.md §15 must reach the pool first.
+    with worker_pool() as pool:
+        assert pool.submit(signal.getsignal, signal.SIGINT).result(timeout=120) == signal.SIG_IGN
+
+
+def recorded_pool(pools):
+    def make():
+        pools.append(worker_pool())
+        return pools[-1]
+
+    return make
+
+
+def test_ctrl_c_cancels_serve_which_shuts_down_in_order(monkeypatch, tmp_path):
+    order = []
+    for owner, name, label in [(web.AppRunner, "cleanup", "runner"), (Jobs, "shutdown", "jobs"), (Store, "close", "store")]:
+        monkeypatch.setattr(owner, name, recording(getattr(owner, name), label, order))
+    config = Config(port=0, token=TOKEN, fred_api_key="", tiingo_api_key="")
+    catalog = load_catalog(ROOT / "catalog.toml")
+    ready = []
+
+    async def forever(runner):
+        ready.append(runner)
+        await asyncio.Event().wait()
+
+    async def run():
+        task = asyncio.create_task(spylead_main.serve(config, catalog, tmp_path, forever))
+        while not ready:
+            await asyncio.sleep(0.01)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    asyncio.run(run())
+    assert order == ["runner", "jobs", "store"]
+
+
+def recording(original, label, order):
+    if asyncio.iscoroutinefunction(original):
+
+        async def wrapper(*args, **kwargs):
+            order.append(label)
+            return await original(*args, **kwargs)
+
+    else:
+
+        def wrapper(*args, **kwargs):
+            order.append(label)
+            return original(*args, **kwargs)
+
+    return wrapper
+
+
+def run_spylead(config, guard):
+    return subprocess.run(
+        [sys.executable, "-m", "spylead", "--config", str(config)],
+        cwd=ROOT,
+        env={**os.environ, "PYTHONPATH": str(guard), "PYTHONIOENCODING": "utf-8"},
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+    )
 
 
 def test_invalid_config_is_reported_before_logging_starts(tmp_path, capsys):
@@ -104,6 +282,18 @@ def test_file_takes_spylead_debug_and_rotates_console_takes_info(tmp_path, capsy
     assert "library detail" not in log_text
     console = capsys.readouterr().err
     assert "phase summary" in console and "refit detail" not in console
+
+
+def test_without_a_console_logging_goes_to_the_file_only(monkeypatch, tmp_path):
+    # pythonw.exe, which the autostart runs, sets sys.stderr to None.
+    monkeypatch.setattr(sys, "stderr", None)
+    with restored_logging():
+        before = set(logging.getLogger().handlers)
+        setup_logging(tmp_path / "logs")
+        added = [handler for handler in logging.getLogger().handlers if handler not in before]
+        logging.getLogger("spylead.jobs").info("phase summary")
+    assert [type(handler) for handler in added] == [logging.handlers.RotatingFileHandler]
+    assert "phase summary" in (tmp_path / "logs" / "spylead.log").read_text(encoding="utf-8")
 
 
 def test_example_config_fails_on_the_placeholder_token_without_network(tmp_path):

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from spylead.catalog import FORMS, CatalogEntry, load_catalog
+from spylead.catalog import FORMS, SPY_NAME, CatalogEntry, load_catalog
 from spylead.config import ConfigError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,6 +93,7 @@ ERRORS = [
     pytest.param(with_beta('"Beta"', '"Beta-2"'), f"entry 2: {NAME_RULE}", id="bad-name"),
     pytest.param(with_beta('"Beta"', f'"{"B" * 41}"'), f"entry 2: {NAME_RULE}", id="long-name"),
     pytest.param(with_beta('"Beta"', '""'), f"entry 2: {NAME_RULE}", id="empty-name"),
+    pytest.param(with_beta('"Beta"', '"SPY"'), "entry 2: name SPY is reserved", id="reserved-name"),
     pytest.param(with_beta('"BETA7"', '"BETA7&file_type=xml"'), "entry 2: fred_id must match [A-Z0-9_]{1,40}", id="bad-fred-id"),
     pytest.param(with_beta('"LEVEL"', '"LOGARITHM"'), "entry 2: form must be LOG or LEVEL", id="bad-form"),
     pytest.param(with_beta('"LEVEL"', '"level"'), "entry 2: form must be LOG or LEVEL", id="lowercase-form"),
@@ -116,4 +117,4 @@ def test_errors_name_the_entry_and_echo_no_value(tmp_path, echoed, text, problem
         load_catalog(path)
     detail = str(caught.value).removeprefix(f"{path}: ")
     assert detail == problem
-    assert echoed(detail, text, rule_words=FORMS) == []
+    assert echoed(detail, text, rule_words=(*FORMS, SPY_NAME)) == []

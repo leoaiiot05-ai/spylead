@@ -41,6 +41,16 @@ class Observations:
         return Observations(self.obs_day[index], self.value[index], self.release_day[index], self.estimated[index])
 
 
+def joined(first: Observations, second: Observations) -> Observations:
+    """Both sets of observations in one: first's, then second's."""
+    return Observations(
+        np.concatenate((first.obs_day, second.obs_day)),
+        np.concatenate((first.value, second.value)),
+        np.concatenate((first.release_day, second.release_day)),
+        np.concatenate((first.estimated, second.estimated)),
+    )
+
+
 def date_to_day(date: datetime.date) -> int:
     return (date - EPOCH).days
 
@@ -70,10 +80,19 @@ def years_before(day: int, years: int) -> int:
 
 def today_at(instant: datetime.datetime) -> int:
     """The date in America/New_York at `instant`, as a day: "today" of SPEC.md §3."""
+    return date_to_day(aware(instant).astimezone(NEW_YORK).date())
+
+
+def utc_text(instant: datetime.datetime) -> str:
+    """`instant` in UTC ISO 8601 to the second, such as 2026-10-28T14:03:11Z: how the database and the API write it."""
+    return aware(instant).astimezone(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def aware(instant: datetime.datetime) -> datetime.datetime:
     if instant.utcoffset() is None:
         # astimezone would read a naive instant as the PC's local time.
         raise ValueError("instant must carry a time zone")
-    return date_to_day(instant.astimezone(NEW_YORK).date())
+    return instant
 
 
 def fred_observations(payload: Any) -> Observations:
@@ -203,14 +222,26 @@ def unchanged(values: np.ndarray) -> np.ndarray:
     return values
 
 
-# y for each form (SPEC.md §5.4). A new form is one more entry here (§18).
+# y for each form (SPEC.md §5.4), and the way back to original units for charts. A new form is one more entry in
+# each (§18).
 TRANSFORMS = {"LOG": np.log, "LEVEL": unchanged}
+ORIGINAL = {"LOG": np.exp, "LEVEL": unchanged}
 FORMS = tuple(TRANSFORMS)
 
 
 def y_values(values: np.ndarray, form: str) -> np.ndarray:
     """y of SPEC.md §5.4: ln(value) for LOG, the value itself for LEVEL. Check has_invalid_values first."""
     return TRANSFORMS[form](np.asarray(values, dtype=float))
+
+
+def original_values(y: np.ndarray, form: str) -> np.ndarray:
+    """Original units from y (SPEC.md §5.4): exp(y) for LOG, y itself for LEVEL. NaN stays NaN."""
+    return ORIGINAL[form](np.asarray(y, dtype=float))
+
+
+def user_form(units: str, values: np.ndarray) -> str:
+    """The form of a series the owner adds (SPEC.md §4.4): LEVEL for units in "Percent" or a value ≤ 0, else LOG."""
+    return "LEVEL" if "Percent" in units or (np.asarray(values) <= 0).any() else "LOG"
 
 
 def has_invalid_values(values: np.ndarray, form: str) -> bool:
