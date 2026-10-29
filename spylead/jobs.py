@@ -474,17 +474,23 @@ class Jobs:
     # Helpers
 
     def rows(self) -> tuple[SeriesRow, list[SeriesRow]]:
-        """SPY's row, and the candidates in catalog order, then USER series by name (SPEC.md §7.4, §11)."""
-        rows = {row.name: row for row in self.store.all_series()}
-        listed = [rows[entry.name] for entry in self.catalog if entry.name in rows]
-        users = [row for row in rows.values() if row.origin == ORIGIN_USER]
-        return rows[SPY_NAME], listed + users
+        """SPY's row, and the candidates."""
+        rows = self.store.all_series()
+        return next(row for row in rows if row.name == SPY_NAME), candidates(rows, self.catalog)
 
     def today(self) -> int:
         return today_at(self.clock())
 
     def now(self) -> str:
         return utc_text(self.clock())
+
+
+def candidates(rows: Sequence[SeriesRow], catalog: Sequence[CatalogEntry]) -> list[SeriesRow]:
+    """The candidates in catalog order, then USER series by name (SPEC.md §7.4, §11). rows come by name."""
+    named = {row.name: row for row in rows}
+    return [named[entry.name] for entry in catalog if entry.name in named] + [
+        row for row in rows if row.origin == ORIGIN_USER
+    ]
 
 
 def daily_of(curve: Curve) -> Daily:

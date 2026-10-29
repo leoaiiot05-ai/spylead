@@ -17,6 +17,7 @@ from spylead.pit import (
     has_invalid_values,
     joined,
     known_points,
+    original_values,
     parse_day,
     tiingo_observations,
     today_at,
@@ -490,3 +491,14 @@ def test_joined_observations_keep_both_in_order():
     second = observations([15], [130])
     assert columns(joined(first, second)) == ([10, 20, 15], [1.0, 2.0, 1.0], [100, 120, 130], [True, False, False])
     assert columns(joined(second, observations([], []))) == columns(second)
+
+
+@pytest.mark.parametrize("form", FORMS)
+def test_original_values_undo_each_form(form):
+    values = np.array([0.5, 2.0, 1234.5678])
+    np.testing.assert_allclose(original_values(y_values(values, form), form), values, rtol=1e-15)
+
+
+def test_original_values_keep_nan():
+    assert np.isnan(original_values(np.array([np.nan]), "LOG")).all()
+    assert original_values(np.array([np.nan, -0.5]), "LEVEL")[1] == -0.5

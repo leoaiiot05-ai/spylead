@@ -20,7 +20,7 @@ from spylead.jobs import JobRunning, Jobs
 from spylead.pit import Observations, joined
 from spylead.smoothing import Anchors
 from spylead.sources import Fred, SourceError, Tiingo
-from spylead.store import Results, Store
+from spylead.store import Store
 
 EPOCH = datetime.date(1970, 1, 1)
 NOW = datetime.datetime(2026, 10, 28, 15, 0, tzinfo=datetime.UTC)

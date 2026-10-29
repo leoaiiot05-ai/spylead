@@ -66,3 +66,25 @@
 ## Deferred items (appended to TODO.md)
 
 None.
+
+### Static files
+
+aiohttp answers a missing static file with an empty 404 response rather than an exception, so one static route at `/` would also answer unknown `/api/*` paths, outside the JSON error format. The app therefore registers each top-level file and folder of `spylead/static/` by name at startup, and `GET /` serves `index.html`. aiohttp's static content types come from Python's own table, not the Windows registry, so `.js` is `text/javascript` and `.webmanifest` `application/manifest+json` on the PC too.
+
+## Result
+
+- `.venv/bin/python -m pytest -q` (Linux VM, Python 3.13, the locked package versions): 618 passed, in about 39 s. New: 134 in `tests/test_web.py` (2 s), 6 in `tests/test_main.py` (one replaced), 3 in `tests/test_pit.py`.
+- AC-17:
+  - each of the 10 session routes answers 401 UNAUTHORIZED without a cookie, with a wrong, short or long one, and after logout, and starts no job;
+  - 415 for every POST without JSON, 400 INVALID_JSON for four bad bodies, 400 INVALID_FIELD for NaN, ±Infinity, booleans, null, strings and lists;
+  - the §13 headers on an API answer, API errors (401, 404, NO_F), static files (`/`, `index.html`, the ECharts file) and a static 404, with `no-store` and `no-cache` where §13 says;
+  - the cookie is HttpOnly, SameSite=Strict, Max-Age 2592000 and Path=/, and Secure only behind `X-Forwarded-Proto: https`; tokens and cookies go through `hmac.compare_digest`;
+  - across every route, error and aiohttp access-log line, and every stored event, neither the token, the session value nor either key appears (the login's Set-Cookie header carries the session value by design);
+  - `serve` listens on 127.0.0.1 only (`test_main.py`).
+- AC-18: the SPY chart (USD), a LOG and a LEVEL series chart, and the F chart, with points at release days, original units, integer days, null for NaN and 6 significant digits; 404 NO_DATA before a compute and for a series without a curve, NOT_FOUND for an unknown series and for SPY, NO_F before a compute and without F.
+- AC-21: a second `python -m spylead` exits with code 3 while the lock is held, under the socket audit hook, leaving only `spylead.lock` in `data/`; a lock held by a killed child is free for the next process; `serve` shuts down in §15's order, both when it ends and when cancelled as Ctrl+C does; the WAL fallback is prompt 5's test.
+- Login, logout, every route's success and error paths, 409 JOB_RUNNING, and the state document with and without results.
+- Mutation checks, each applied to a copy of the repository outside it, with `tests/test_web.py` run against the copy. All 14 were caught (the constant-time one after its test was added):
+  - headers only on successes, `no-cache` on the API, a cookie without HttpOnly, Secure always, the state route without a session, a plain string comparison;
+  - no login delay, any content type, booleans as numbers, an exception's text in a 500;
+  - 5 significant digits, charts in y, raw points at observation days, ALREADY_EXISTS by name only.

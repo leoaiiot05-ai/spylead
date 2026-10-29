@@ -222,14 +222,21 @@ def unchanged(values: np.ndarray) -> np.ndarray:
     return values
 
 
-# y for each form (SPEC.md §5.4). A new form is one more entry here (§18).
+# y for each form (SPEC.md §5.4), and the way back to original units for charts. A new form is one more entry in
+# each (§18).
 TRANSFORMS = {"LOG": np.log, "LEVEL": unchanged}
+ORIGINAL = {"LOG": np.exp, "LEVEL": unchanged}
 FORMS = tuple(TRANSFORMS)
 
 
 def y_values(values: np.ndarray, form: str) -> np.ndarray:
     """y of SPEC.md §5.4: ln(value) for LOG, the value itself for LEVEL. Check has_invalid_values first."""
     return TRANSFORMS[form](np.asarray(values, dtype=float))
+
+
+def original_values(y: np.ndarray, form: str) -> np.ndarray:
+    """Original units from y (SPEC.md §5.4): exp(y) for LOG, y itself for LEVEL. NaN stays NaN."""
+    return ORIGINAL[form](np.asarray(y, dtype=float))
 
 
 def user_form(units: str, values: np.ndarray) -> str:
