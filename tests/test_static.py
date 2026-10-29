@@ -151,6 +151,12 @@ def test_the_page_has_no_inline_script_style_or_handler():
     assert [(name, key) for name, attributes in tags for key in attributes if key == "style" or key.startswith("on")] == []
 
 
+def test_a_native_login_submit_never_puts_the_token_in_a_url():
+    # The access log records request lines (SPEC.md §13).
+    (form,) = Tags(INDEX).find("form", id="login-form")
+    assert (form["method"], form["action"]) == ("post", "/api/login")
+
+
 def test_app_js_sets_no_attribute_that_could_carry_a_url_or_code():
     assert set(re.findall(r"setAttribute\(\s*\"([^\"]+)\"", APP)) == {"aria-label"}
 

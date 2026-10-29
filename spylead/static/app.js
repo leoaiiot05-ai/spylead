@@ -140,14 +140,20 @@ async function api(method, path, body) {
     init.body = JSON.stringify(body);
   }
   let response;
-  let data;
   try {
     response = await fetch(path, init);
-    data = response.status === 204 ? null : await response.json().catch(() => null);
   } catch {
     throw new ApiError(0, "", "");
   }
+  if (response.status === 204) return null;
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    // Not JSON, or cut off by the timeout: the status decides below.
+  }
   if (!response.ok) throw new ApiError(response.status, data?.error ?? `HTTP_${response.status}`, data?.message ?? "");
+  if (data === null) throw new ApiError(0, "", "");
   return data;
 }
 
@@ -474,7 +480,8 @@ function rowClicked(event) {
   if (!row) return;
   if (event.target.closest(".remove")) return removeSeries(row.dataset.name);
   if (event.target.closest(".check-target")) return;
-  if ("chart" in row.dataset) openSeries(row.dataset.name);
+  // A click that ends a text selection, such as a FRED ID being copied, opens nothing.
+  if ("chart" in row.dataset && !String(window.getSelection())) openSeries(row.dataset.name);
 }
 
 function rowChanged(event) {

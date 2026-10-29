@@ -21,8 +21,8 @@
 <body>
 <header class="bar">
   <h1 class="brand">spylead</h1>
-  <div id="bar-status" class="bar-status" aria-live="polite" hidden>
-    <p id="last-job"></p>
+  <div id="bar-status" class="bar-status" hidden>
+    <p id="last-job" aria-live="polite"></p>
     <p id="last-job-detail" class="detail" hidden></p>
     <div id="job" class="job" hidden>
       <p id="job-text"></p>
@@ -44,7 +44,9 @@
 </div>
 
 <section id="login" class="panel login" hidden>
-  <form id="login-form">
+  <!-- Should the script ever fail, a native submit sends the token in a body, never in a URL that the access log
+       records. The script answers every submit itself. -->
+  <form id="login-form" method="post" action="/api/login">
     <h2 data-i18n="login.title"></h2>
     <label for="token" data-i18n="login.token"></label>
     <input id="token" name="token" type="password" autocomplete="current-password" required>
@@ -55,7 +57,7 @@
 </section>
 
 <main id="main" hidden>
-  <section id="settings" class="panel">
+  <section class="panel">
     <h2 data-i18n="settings.title"></h2>
     <div class="n-row">
       <span id="n-label" data-i18n="settings.label"></span>
@@ -69,7 +71,7 @@
     <p id="windows" class="detail" hidden></p>
   </section>
 
-  <section id="candidates" class="panel">
+  <section class="panel">
     <h2 data-i18n="table.title"></h2>
     <div class="table-scroll">
       <table>
